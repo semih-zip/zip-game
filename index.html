@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Zip-like Mini Game</title>
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", system-ui, sans-serif; }
+    * { -webkit-tap-highlight-color: transparent; }
+    body { margin:0; background:#0b0f14; color:#e8eef6; }
+    .wrap { padding:14px; }
+    h1 { font-size:16px; margin:0 0 10px; }
+    .top { display:flex; flex-wrap:wrap; gap:8px; }
+    .pill { background:#1a2433; border-radius:999px; padding:6px 10px; font-size:13px; }
+    #arena {
+      margin-top:12px;
+      height:60vh;
+      background:#0d131c;
+      border-radius:16px;
+      position:relative;
+      overflow:hidden;
+    }
+    .target {
+      position:absolute;
+      width:72px; height:72px;
+      border-radius:20px;
+      background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.08));
+      display:flex; align-items:center; justify-content:center;
+      font-weight:900;
+      user-select:none;
+    }
+    button {
+      margin-top:10px;
+      padding:12px 16px;
+      border-radius:14px;
+      border:none;
+      background:#3b82f6;
+      color:white;
+      font-weight:700;
+      font-size:14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Zip-like Mini Game</h1>
+    <div class="top">
+      <div class="pill">점수: <span id="score">0</span></div>
+      <div class="pill">시간: <span id="time">—</span></div>
+    </div>
+    <button id="start">시작</button>
+    <div id="arena"></div>
+  </div>
+
+<script>
+let score=0,time=20,run=false,timer,spawn;
+const arena=document.getElementById("arena");
+const scoreEl=document.getElementById("score");
+const timeEl=document.getElementById("time");
+document.getElementById("start").onclick=()=>{
+  if(run) return;
+  score=0; time=20; run=true;
+  scoreEl.textContent=0;
+  timeEl.textContent=time+"s";
+  arena.innerHTML="";
+  timer=setInterval(()=>{
+    time--;
+    timeEl.textContent=time+"s";
+    if(time<=0){ end(); }
+  },1000);
+  spawn=setInterval(make,700);
+  make();
+};
+function make(){
+  if(!run) return;
+  const d=document.createElement("div");
+  d.className="target";
+  d.textContent="ZIP";
+  d.style.left=Math.random()*80+10+"%";
+  d.style.top=Math.random()*80+10+"%";
+  d.onclick=()=>{
+    score++;
+    scoreEl.textContent=score;
+    d.remove();
+  };
+  arena.appendChild(d);
+  setTimeout(()=>d.remove(),1200);
+}
+function end(){
+  run=false;
+  clearInterval(timer);
+  clearInterval(spawn);
+  alert("끝! 점수: "+score);
+}
+</script>
+</body>
+</html>
