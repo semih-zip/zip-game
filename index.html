@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Zip Numbers — Drag Connect</title>
+  <title>Zip Puzzle</title>
   <style>
     :root { font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", system-ui, sans-serif; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { margin:0; background:#0b0f14; color:#e8eef6; }
     .wrap { padding: 14px; padding-bottom: 22px; max-width: 980px; margin: 0 auto; }
-    h1 { font-size: 16px; margin: 0 0 10px; font-weight: 800; letter-spacing: .2px; }
+    h1 { font-size: 16px; margin: 0 0 10px; font-weight: 950; letter-spacing: .2px; }
 
     .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
     .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
@@ -19,20 +19,19 @@
       border-radius: 999px;
       padding: 8px 10px;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 900;
     }
 
-    button, select {
+    select, button {
       background:#162031; color:#e8eef6;
       border:1px solid rgba(255,255,255,.16);
       padding: 12px 14px;
       border-radius: 14px;
-      font-weight: 800;
+      font-weight: 950;
       font-size: 14px;
       cursor: pointer;
       touch-action: manipulation;
     }
-    button:disabled { opacity:.45; cursor:not-allowed; }
 
     .card {
       margin-top: 12px;
@@ -43,47 +42,79 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
     }
 
-    #arena {
+    #boardWrap{
       margin-top: 10px;
-      height: min(64vh, 560px);
       border-radius: 16px;
-      border:1px solid rgba(255,255,255,.14);
-      position: relative;
-      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.14);
+      overflow: hidden;
       background:
         radial-gradient(900px 500px at 20% 10%, rgba(102, 226, 255, .14), transparent 60%),
         radial-gradient(900px 500px at 80% 90%, rgba(255, 140, 235, .12), transparent 60%),
         #0d131c;
-      touch-action: none; /* critical: we handle drag ourselves */
-    }
-
-    canvas {
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      pointer-events:none;
-    }
-
-    .dot {
-      position:absolute;
-      width: 64px; height: 64px;
-      border-radius: 22px;
-      transform: translate(-50%, -50%);
-      display:flex; align-items:center; justify-content:center;
-      user-select:none;
-      font-weight: 900;
-      font-size: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.08));
-      border:1px solid rgba(255,255,255,.22);
-      box-shadow: 0 12px 26px rgba(0,0,0,.35);
       touch-action: none;
+      position: relative;
+      padding: 10px;
     }
-    .dot.next {
+
+    #grid {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      gap: 6px;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .cell{
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.04);
+      position: relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow: hidden;
+    }
+    .cell.visited{
+      background: rgba(102,226,255,.14);
+      border-color: rgba(102,226,255,.35);
+    }
+    .cell.bad{
+      background: rgba(255,70,70,.16);
+      border-color: rgba(255,70,70,.35);
+    }
+
+    /* number badge (top-right) */
+    .numBadge{
+      position:absolute;
+      inset: 8px 8px auto auto;
+      min-width: 30px;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 14px;
+      font-weight: 1000;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.20);
+      color: rgba(255,255,255,.96);
+    }
+    .cell.next .numBadge{
       outline: 3px solid rgba(102,226,255,.55);
       outline-offset: 2px;
     }
-    .dot.done { opacity: .72; }
 
-    .hint { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.45; opacity: .82; }
+    canvas{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      pointer-events:none;
+    }
+
+    .hint { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; opacity: .84; }
 
     .split { display:grid; grid-template-columns: 1fr; gap: 12px; }
     @media (min-width: 860px){ .split { grid-template-columns: 1.2fr .8fr; } }
@@ -99,12 +130,13 @@
 <body>
   <div class="wrap">
     <div class="bar">
-      <h1>Zip Numbers — 드래그로 순서 연결</h1>
+      <h1>Zip 퍼즐</h1>
       <div class="row">
         <span class="pill">상태: <strong id="status">대기</strong></span>
-        <span class="pill">진행: <strong id="progress">0/0</strong></span>
-        <span class="pill">현재 기록: <strong id="time">—</strong></span>
-        <span class="pill">최고 기록: <strong id="best">—</strong></span>
+        <span class="pill">다음 숫자: <strong id="cp">1/—</strong></span>
+        <span class="pill">채움: <strong id="fill">0/—</strong></span>
+        <span class="pill">기록: <strong id="time">—</strong></span>
+        <span class="pill">BEST: <strong id="best">—</strong></span>
       </div>
     </div>
 
@@ -113,36 +145,34 @@
         <div class="row" style="justify-content:space-between;">
           <div class="row">
             <label class="pill" style="display:flex;gap:8px;align-items:center;">
-              점 개수
-              <select id="count">
-                <option value="8">8 (Easy)</option>
-                <option value="12" selected>12 (Normal)</option>
-                <option value="16">16 (Hard)</option>
-                <option value="20">20 (Very Hard)</option>
+              숫자
+              <select id="puzzleSel">
+                <option value="p8">1~8</option>
+                <option value="p9" selected>1~9</option>
               </select>
             </label>
+            <span class="pill">격자: <strong>5×5</strong></span>
           </div>
           <div class="row">
-            <button id="startBtn">시작</button>
-            <button id="shuffleBtn">새로 배치</button>
+            <button id="resetBtn">리셋</button>
+            <button id="clearBtn">기록 초기화</button>
           </div>
         </div>
 
-        <div id="arena">
+        <div id="boardWrap">
           <canvas id="lines"></canvas>
+          <div id="grid" aria-label="grid"></div>
         </div>
 
         <div class="hint">
-          <strong>1을 누른 뒤 손가락을 떼지 말고</strong> 2→3→… 순서대로 지나가면 선이 이어져.
-          중간에 손을 떼면 실패(리셋) 처리.
+          <strong>1에서 손가락을 대고 드래그하면 바로 시작</strong>. 상/하/좌/우로만 이동해서
+          <strong>모든 칸을 한 번씩</strong> 지나가며 숫자 <strong>1→2→…</strong> 순서대로 통과해.
+          손을 떼면 즉시 실패(리셋).
         </div>
       </div>
 
       <div class="card">
-        <div class="row" style="justify-content:space-between;">
-          <strong>기록</strong>
-          <button id="clearBtn" style="padding:10px 12px;">기록 초기화</button>
-        </div>
+        <strong>최근 기록</strong>
         <div style="height:10px"></div>
         <div class="log" id="log"></div>
       </div>
@@ -151,67 +181,130 @@
 
 <script>
 (() => {
-  const arena = document.getElementById('arena');
+  // ===== 퍼즐 데이터 (체크포인트 위치) =====
+  // NOTE: 이건 "동작 완성"을 위한 기본 퍼즐 2개야.
+  // Zip처럼 매일 퍼즐을 늘리고 싶으면, PUZZLES에 더 추가하면 됨.
+  const PUZZLES = {
+    p9: {
+      name: "1~9",
+      size: 5,
+      cps: {
+        "1": [0,0],
+        "2": [0,4],
+        "3": [1,0],
+        "4": [1,4],
+        "5": [2,0],
+        "6": [2,4],
+        "7": [3,0],
+        "8": [3,4],
+        "9": [4,4],
+      }
+    },
+    p8: {
+      name: "1~8",
+      size: 5,
+      cps: {
+        "1": [0,0],
+        "2": [0,4],
+        "3": [1,0],
+        "4": [1,4],
+        "5": [2,0],
+        "6": [2,4],
+        "7": [3,0],
+        "8": [4,4],
+      }
+    },
+  };
+
+  // ===== DOM =====
+  const gridEl = document.getElementById('grid');
+  const wrapEl = document.getElementById('boardWrap');
   const canvas = document.getElementById('lines');
   const ctx = canvas.getContext('2d');
 
   const statusEl = document.getElementById('status');
-  const progressEl = document.getElementById('progress');
+  const cpEl = document.getElementById('cp');
+  const fillEl = document.getElementById('fill');
   const timeEl = document.getElementById('time');
   const bestEl = document.getElementById('best');
   const logEl = document.getElementById('log');
 
-  const startBtn = document.getElementById('startBtn');
-  const shuffleBtn = document.getElementById('shuffleBtn');
+  const resetBtn = document.getElementById('resetBtn');
   const clearBtn = document.getElementById('clearBtn');
-  const countSel = document.getElementById('count');
+  const puzzleSel = document.getElementById('puzzleSel');
 
-  const LS_BEST = 'zip_numbers_best_ms_v1';
-  const LS_RUNS = 'zip_numbers_runs_v1'; // array of ms numbers
+  // ===== 상태 =====
+  let puzzle = PUZZLES[puzzleSel.value];
+  let S = puzzle.size;
+  let totalCells = S*S;
 
-  let dots = []; // {n, x, y, el}
-  let N = Number(countSel.value);
+  let cells = [];
+  let cpMap = new Map();   // "r,c" -> number
+  let cpCount = 0;
 
-  let running = false;
+  let armed = true;        // waiting for start at 1
   let dragging = false;
-  let nextNeeded = 1;
-  let path = []; // array of {x,y} for connected dots in order
+  let pointerId = null;
+
+  let visited = [];
+  let path = [];           // [{r,c}]
+  let current = null;
+
+  let nextCp = 1;
   let startMs = 0;
   let raf = 0;
 
+  function keyRC(r,c){ return `${r},${c}`; }
+  function idx(r,c){ return r*S + c; }
+  function inBounds(r,c){ return r>=0 && r<S && c>=0 && c<S; }
+  function adj(a,b){
+    const dr = Math.abs(a.r-b.r);
+    const dc = Math.abs(a.c-b.c);
+    return (dr+dc) === 1;
+  }
   function msToText(ms){
-    const s = ms / 1000;
+    const s = ms/1000;
     if (s < 60) return `${s.toFixed(2)}s`;
     const m = Math.floor(s/60);
     const r = (s - m*60).toFixed(2).padStart(5,'0');
     return `${m}:${r}`;
   }
-
-  function readBest(){
-    const v = Number(localStorage.getItem(LS_BEST) || 0);
-    bestEl.textContent = v ? msToText(v) : '—';
-  }
-
-  function readRuns(){
-    const raw = localStorage.getItem(LS_RUNS);
-    let arr = [];
-    try { if (raw) arr = JSON.parse(raw); } catch {}
-    return Array.isArray(arr) ? arr : [];
-  }
-
-  function writeRuns(arr){
-    localStorage.setItem(LS_RUNS, JSON.stringify(arr.slice(0, 15)));
-  }
-
+  function setStatus(s){ statusEl.textContent = s; }
   function log(msg){
     const ts = new Date().toLocaleTimeString();
     logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
   }
+  function vibrate(ms=20){ try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} }
 
-  function setStatus(s){ statusEl.textContent = s; }
+  function LS_BEST(){ return `zip_best_${puzzleSel.value}_v1`; }
+  function LS_RUNS(){ return `zip_runs_${puzzleSel.value}_v1`; }
 
+  function readBest(){
+    const v = Number(localStorage.getItem(LS_BEST()) || 0);
+    bestEl.textContent = v ? msToText(v) : '—';
+  }
+  function readRuns(){
+    const raw = localStorage.getItem(LS_RUNS());
+    let arr = [];
+    try { if (raw) arr = JSON.parse(raw); } catch {}
+    return Array.isArray(arr) ? arr : [];
+  }
+  function writeRuns(arr){
+    localStorage.setItem(LS_RUNS(), JSON.stringify(arr.slice(0, 10)));
+  }
+  function renderRuns(){
+    const runs = readRuns();
+    if (!runs.length){
+      logEl.textContent = '기록이 아직 없어.\n완주하면 저장돼.\n';
+      return;
+    }
+    const lines = runs.map((ms,i)=>`${String(i+1).padStart(2,'0')}. ${msToText(ms)}`).join('\n');
+    logEl.textContent = `최근 기록 (${puzzle.name})\n${lines}\n`;
+  }
+
+  // ===== canvas =====
   function resizeCanvas(){
-    const r = arena.getBoundingClientRect();
+    const r = wrapEl.getBoundingClientRect();
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     canvas.width = Math.floor(r.width * dpr);
     canvas.height = Math.floor(r.height * dpr);
@@ -221,146 +314,41 @@
     draw();
   }
 
-  function clearDots(){
-    dots.forEach(d => d.el.remove());
-    dots = [];
+  function cellCenter(r,c){
+    const el = cells[idx(r,c)];
+    const b = el.getBoundingClientRect();
+    const w = wrapEl.getBoundingClientRect();
+    return { x: (b.left - w.left) + b.width/2, y: (b.top - w.top) + b.height/2 };
   }
 
-  function placeDots(){
-    clearDots();
-    N = Number(countSel.value);
-
-    const r = arena.getBoundingClientRect();
-    const pad = 48;          // safe padding
-    const minDist = 62;      // reduce overlaps
-
-    function tooClose(x,y, arr){
-      for (const p of arr){
-        const dx = x - p.x, dy = y - p.y;
-        if (Math.hypot(dx,dy) < minDist) return true;
-      }
-      return false;
-    }
-
-    const pts = [];
-    let guard = 0;
-    while (pts.length < N && guard++ < 4000){
-      const x = pad + Math.random() * (r.width - pad*2);
-      const y = pad + Math.random() * (r.height - pad*2);
-      if (!tooClose(x,y, pts)) pts.push({x,y});
-    }
-
-    for (let i=1;i<=N;i++){
-      const p = pts[i-1];
-      const el = document.createElement('div');
-      el.className = 'dot';
-      el.textContent = String(i);
-      el.style.left = `${p.x}px`;
-      el.style.top = `${p.y}px`;
-      // we intentionally DO NOT use click; drag hit-testing uses geometry
-      arena.appendChild(el);
-      dots.push({ n:i, x:p.x, y:p.y, el });
-    }
-
-    progressEl.textContent = `0/${N}`;
-    highlightNext();
-    draw();
-  }
-
-  function highlightNext(){
-    dots.forEach(d => d.el.classList.remove('next'));
-    const d = dots.find(x => x.n === nextNeeded);
-    if (d) d.el.classList.add('next');
-  }
-
-  function resetRun(reason){
-    running = false;
-    dragging = false;
-    nextNeeded = 1;
-    path = [];
-    cancelAnimationFrame(raf);
-    raf = 0;
-    timeEl.textContent = '—';
-    setStatus('대기');
-    dots.forEach(d => d.el.classList.remove('done'));
-    highlightNext();
-    draw();
-    if (reason) log(`리셋: ${reason}`);
-  }
-
-  function startRun(){
-    resetRun();
-    running = true;
-    setStatus('준비: 1에서 시작');
-    progressEl.textContent = `0/${N}`;
-    highlightNext();
-    draw();
-  }
-
-  function finishRun(){
-    running = false;
-    dragging = false;
-    cancelAnimationFrame(raf);
-    raf = 0;
-
-    const elapsed = performance.now() - startMs;
-    timeEl.textContent = msToText(elapsed);
-    setStatus('완료');
-
-    // best
-    const best = Number(localStorage.getItem(LS_BEST) || 0);
-    if (!best || elapsed < best){
-      localStorage.setItem(LS_BEST, String(Math.round(elapsed)));
-      readBest();
-      log(`🏁 신기록! ${msToText(elapsed)}`);
-    } else {
-      log(`완료: ${msToText(elapsed)}`);
-    }
-
-    // runs
-    const runs = readRuns();
-    runs.unshift(Math.round(elapsed));
-    writeRuns(runs);
-    renderRuns();
-  }
-
-  function renderRuns(){
-    const runs = readRuns();
-    if (!runs.length){
-      logEl.textContent = '기록이 아직 없어.\n(완주하면 여기에 저장돼)\n' + logEl.textContent;
-      return;
-    }
-    const lines = runs.slice(0,10).map((ms, i) => `${String(i+1).padStart(2,'0')}. ${msToText(ms)}`).join('\n');
-    const header = `최근 기록 TOP ${Math.min(10, runs.length)}\n${lines}\n\n`;
-    // keep newest log messages under header
-    const rest = logEl.textContent.split('\n').slice(0,60).join('\n');
-    logEl.textContent = header + rest;
+  function wrapPointFromEvent(e){
+    const r = wrapEl.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
   function draw(pointer=null){
-    // pointer: {x,y} in arena coords while dragging
-    const w = arena.clientWidth;
-    const h = arena.clientHeight;
+    const w = wrapEl.clientWidth;
+    const h = wrapEl.clientHeight;
     ctx.clearRect(0,0,w,h);
-
-    // base style
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // draw connected path
     if (path.length >= 2){
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 10;
       ctx.strokeStyle = 'rgba(102,226,255,.70)';
       ctx.beginPath();
-      ctx.moveTo(path[0].x, path[0].y);
-      for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x, path[i].y);
+      const p0 = cellCenter(path[0].r, path[0].c);
+      ctx.moveTo(p0.x, p0.y);
+      for (let i=1;i<path.length;i++){
+        const pi = cellCenter(path[i].r, path[i].c);
+        ctx.lineTo(pi.x, pi.y);
+      }
       ctx.stroke();
     }
 
-    // draw active line to pointer while dragging
-    if (dragging && path.length >= 1 && pointer){
-      const last = path[path.length-1];
-      ctx.lineWidth = 6;
+    if (dragging && pointer && path.length >= 1){
+      const last = cellCenter(path[path.length-1].r, path[path.length-1].c);
+      ctx.lineWidth = 7;
       ctx.strokeStyle = 'rgba(255,255,255,.35)';
       ctx.beginPath();
       ctx.moveTo(last.x, last.y);
@@ -369,174 +357,275 @@
     }
   }
 
-  function arenaPointFromEvent(e){
-    const r = arena.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
+  // ===== grid build =====
+  function rebuild(){
+    puzzle = PUZZLES[puzzleSel.value];
+    S = puzzle.size;
+    totalCells = S*S;
 
-  // Hit-test: returns dot number if pointer is within radius
-  function hitDot(pt){
-    const radius = 42; // forgiving for fingers
-    for (const d of dots){
-      const dx = pt.x - d.x, dy = pt.y - d.y;
-      if (Math.hypot(dx,dy) <= radius) return d.n;
+    cpMap.clear();
+    cpCount = Object.keys(puzzle.cps).length;
+    for (const [num, rc] of Object.entries(puzzle.cps)){
+      cpMap.set(keyRC(rc[0],rc[1]), Number(num));
     }
-    return null;
+
+    gridEl.style.gridTemplateColumns = `repeat(${S}, 1fr)`;
+    gridEl.innerHTML = '';
+    cells = [];
+
+    for (let r=0;r<S;r++){
+      for (let c=0;c<S;c++){
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.dataset.r = String(r);
+        el.dataset.c = String(c);
+
+        const badgeNum = cpMap.get(keyRC(r,c));
+        if (badgeNum){
+          const badge = document.createElement('div');
+          badge.className = 'numBadge';
+          badge.textContent = String(badgeNum);
+          el.appendChild(badge);
+        }
+
+        gridEl.appendChild(el);
+        cells.push(el);
+      }
+    }
+
+    hardReset('퍼즐 로드');
+    readBest();
+    renderRuns();
+    resizeCanvas();
   }
 
-  function markDone(n){
-    const d = dots.find(x => x.n === n);
-    if (d) d.el.classList.add('done');
+  function highlightNextCp(){
+    cells.forEach(el => el.classList.remove('next'));
+    for (let r=0;r<S;r++){
+      for (let c=0;c<S;c++){
+        if (cpMap.get(keyRC(r,c)) === nextCp){
+          cells[idx(r,c)].classList.add('next');
+          return;
+        }
+      }
+    }
+  }
+
+  // ===== game core =====
+  function hardReset(reason){
+    armed = true;
+    dragging = false;
+    pointerId = null;
+    visited = new Array(totalCells).fill(false);
+    path = [];
+    current = null;
+    nextCp = 1;
+    startMs = 0;
+    cancelAnimationFrame(raf); raf = 0;
+
+    cells.forEach(el => el.classList.remove('visited','bad'));
+    setStatus('대기');
+    timeEl.textContent = '—';
+    cpEl.textContent = `1/${cpCount}`;
+    fillEl.textContent = `0/${totalCells}`;
+    highlightNextCp();
+    draw();
+    if (reason) log(`리셋: ${reason}`);
+  }
+
+  function fail(reason, flashIndex=null){
+    setStatus('실패');
+    vibrate(35);
+    if (flashIndex !== null) cells[flashIndex].classList.add('bad');
+
+    // Zip 느낌: 거의 즉시 다시 시작 가능
+    setTimeout(() => {
+      if (flashIndex !== null) cells[flashIndex].classList.remove('bad');
+      // reset to "armed" state
+      armed = true;
+      dragging = false;
+      pointerId = null;
+      visited.fill(false);
+      path = [];
+      current = null;
+      nextCp = 1;
+      startMs = 0;
+      cancelAnimationFrame(raf); raf = 0;
+
+      cells.forEach(el => el.classList.remove('visited'));
+      setStatus('대기');
+      timeEl.textContent = '—';
+      cpEl.textContent = `1/${cpCount}`;
+      fillEl.textContent = `0/${totalCells}`;
+      highlightNextCp();
+      draw();
+    }, 220);
+    if (reason) log(`실패: ${reason}`);
+  }
+
+  function finish(){
+    setStatus('완료');
+    dragging = false;
+    pointerId = null;
+    cancelAnimationFrame(raf); raf = 0;
+
+    const elapsed = performance.now() - startMs;
+    timeEl.textContent = msToText(elapsed);
+    vibrate(70);
+
+    const best = Number(localStorage.getItem(LS_BEST()) || 0);
+    if (!best || elapsed < best){
+      localStorage.setItem(LS_BEST(), String(Math.round(elapsed)));
+      readBest();
+    }
+
+    const runs = readRuns();
+    runs.unshift(Math.round(elapsed));
+    writeRuns(runs);
+    renderRuns();
+
+    // After completion, reset to allow a new run (Zip 느낌)
+    setTimeout(() => hardReset('완료 후 리셋'), 350);
   }
 
   function tickTimer(){
-    if (!running || !dragging) return;
+    if (!dragging) return;
     const elapsed = performance.now() - startMs;
     timeEl.textContent = msToText(elapsed);
     raf = requestAnimationFrame(tickTimer);
   }
 
-  // Pointer handling
-  let pointerId = null;
+  function cellFromEvent(e){
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const cell = el?.classList?.contains('cell') ? el : el?.closest?.('.cell');
+    if (!cell) return null;
+    const r = Number(cell.dataset.r);
+    const c = Number(cell.dataset.c);
+    if (!inBounds(r,c)) return null;
+    return { r,c };
+  }
 
-  arena.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    if (!running) return;
+  function stepInto(rc){
+    const i = idx(rc.r, rc.c);
 
-    // lock to first pointer only
-    if (pointerId !== null) return;
-    pointerId = e.pointerId;
-    arena.setPointerCapture(pointerId);
+    // adjacency (except first)
+    if (current && !adj(current, rc)) return;
 
-    const pt = arenaPointFromEvent(e);
-    const hit = hitDot(pt);
+    // no revisits
+    if (visited[i]) return;
 
-    // Must start on 1
-    if (nextNeeded === 1){
-      if (hit !== 1){
-        // ignore (don’t fail) — just require starting at 1
-        setStatus('1에서 시작');
-        draw(pt);
+    // checkpoint check
+    const badge = cpMap.get(keyRC(rc.r, rc.c));
+    if (badge){
+      if (badge !== nextCp){
+        fail(`순서 틀림 (필요 ${nextCp}, 들어감 ${badge})`, i);
         return;
       }
-      // start drag officially
+    }
+
+    // visit
+    visited[i] = true;
+    cells[i].classList.add('visited');
+    path.push(rc);
+    current = rc;
+
+    if (badge && badge === nextCp){
+      nextCp += 1;
+      highlightNextCp();
+    }
+
+    fillEl.textContent = `${path.length}/${totalCells}`;
+    cpEl.textContent = `${nextCp}/${cpCount}`;
+
+    const allFilled = (path.length === totalCells);
+    const allCpDone = (nextCp === cpCount + 1);
+    if (allFilled && allCpDone){
+      finish();
+    }
+  }
+
+  // ===== pointer events =====
+  wrapEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (pointerId !== null) return;
+
+    const rc = cellFromEvent(e);
+    if (!rc) return;
+
+    // Must start at "1" when armed
+    if (armed){
+      const need1 = puzzle.cps["1"];
+      if (!need1 || rc.r !== need1[0] || rc.c !== need1[1]){
+        fail('1에서 시작해야 함', idx(rc.r, rc.c));
+        return;
+      }
+
+      // Zip 방식: 1을 누르는 순간 즉시 시작
+      armed = false;
       dragging = true;
       startMs = performance.now();
       setStatus('진행중');
-      path = [{ x: dots[0].x, y: dots[0].y }];
-      markDone(1);
-      nextNeeded = 2;
-      progressEl.textContent = `1/${N}`;
-      highlightNext();
-      draw(pt);
+
+      pointerId = e.pointerId;
+      wrapEl.setPointerCapture(pointerId);
+
+      stepInto(rc);
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tickTimer);
+
+      draw(wrapPointFromEvent(e));
       return;
     }
 
-    // If already started but pointerdown again (shouldn’t normally), treat as fail
-    if (nextNeeded > 1){
-      resetRun('중간에 다시 눌렀어 (손 떼면 실패)');
-    }
+    // if not armed, any new pointerdown means user lifted earlier -> handled in pointerup
+    // we ignore extra touches
   }, { passive:false });
 
-  arena.addEventListener('pointermove', (e) => {
-    if (!running) return;
+  wrapEl.addEventListener('pointermove', (e) => {
     if (pointerId === null || e.pointerId !== pointerId) return;
+    e.preventDefault();
 
-    const pt = arenaPointFromEvent(e);
-
-    if (!dragging){
-      // not started yet, just show guide line from nothing
-      draw(pt);
-      return;
+    const pt = wrapPointFromEvent(e);
+    if (dragging){
+      const rc = cellFromEvent(e);
+      if (rc) stepInto(rc);
     }
-
-    // must stay dragging; check if you reached next dot
-    const hit = hitDot(pt);
-    if (hit === nextNeeded){
-      const d = dots.find(x => x.n === hit);
-      path.push({ x:d.x, y:d.y });
-      markDone(hit);
-      progressEl.textContent = `${hit}/${N}`;
-
-      if (hit === N){
-        // finished without lifting
-        draw(pt);
-        finishRun();
-        pointerId = null;
-        try { arena.releasePointerCapture(e.pointerId); } catch {}
-        return;
-      }
-
-      nextNeeded += 1;
-      highlightNext();
-    }
-
     draw(pt);
   }, { passive:false });
 
-  function failIfDragging(reason){
-    if (dragging){
-      resetRun(reason);
-    } else {
-      setStatus('대기');
-    }
+  function endPointer(e, reason){
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    try { wrapEl.releasePointerCapture(pointerId); } catch {}
     pointerId = null;
+
+    // lifting always fails unless already finished (finish() resets)
+    if (dragging){
+      fail(reason);
+    }
   }
 
-  arena.addEventListener('pointerup', (e) => {
-    if (pointerId === null || e.pointerId !== pointerId) return;
-    e.preventDefault();
-    // If you lift before finishing => fail
-    if (running && dragging) failIfDragging('손을 떼서 실패');
-    else pointerId = null;
-    try { arena.releasePointerCapture(e.pointerId); } catch {}
-  }, { passive:false });
+  wrapEl.addEventListener('pointerup', (e) => endPointer(e, '손을 떼서 실패'), { passive:false });
+  wrapEl.addEventListener('pointercancel', (e) => endPointer(e, '입력 취소'), { passive:false });
 
-  arena.addEventListener('pointercancel', (e) => {
-    if (pointerId === null || e.pointerId !== pointerId) return;
-    e.preventDefault();
-    if (running && dragging) failIfDragging('입력이 취소돼서 실패');
-    else pointerId = null;
-  }, { passive:false });
-
-  // Buttons
-  startBtn.addEventListener('click', () => {
-    startRun();
-    log('시작 눌림: 1을 드래그로 시작해줘');
-  });
-
-  shuffleBtn.addEventListener('click', () => {
-    resetRun();
-    placeDots();
-    log('새로 배치');
-  });
-
+  // ===== controls =====
+  resetBtn.addEventListener('click', () => hardReset('수동 리셋'));
   clearBtn.addEventListener('click', () => {
-    localStorage.removeItem(LS_BEST);
-    localStorage.removeItem(LS_RUNS);
+    localStorage.removeItem(LS_BEST());
+    localStorage.removeItem(LS_RUNS());
     readBest();
-    logEl.textContent = '';
+    renderRuns();
     log('기록 초기화');
   });
 
-  countSel.addEventListener('change', () => {
-    resetRun();
-    placeDots();
-    log(`점 개수 변경: ${countSel.value}`);
+  puzzleSel.addEventListener('change', () => {
+    rebuild();
   });
 
-  window.addEventListener('resize', () => {
-    resizeCanvas();
-  });
+  window.addEventListener('resize', resizeCanvas);
 
   // init
-  readBest();
-  placeDots();
-  resizeCanvas();
-  renderRuns();
-  log('준비 완료. 시작을 누르고 1에서 손을 떼지 말고 끝까지 이어줘.');
+  rebuild();
 })();
 </script>
 </body>
